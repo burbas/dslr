@@ -1,7 +1,8 @@
 -module(dslr).
 -export([
          create_env/0,
-         capture_photo/2
+         capture_image/1,
+         capture_image/2
         ]).
 -on_load(init/0).
 
@@ -25,7 +26,10 @@ init() ->
 create_env() ->
     not_loaded(?LINE).
 
-capture_photo(_Reference, _Filename) ->
+capture_image(_Reference) ->
+    not_loaded(?LINE).
+
+capture_image(_Reference, _Filename) ->
     not_loaded(?LINE).
 
 

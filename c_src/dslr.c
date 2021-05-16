@@ -38,7 +38,48 @@ load(ErlNifEnv* env, void** priv, ERL_NIF_TERM load_info)
 }
 
 static ERL_NIF_TERM
-capture_image(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
+capture_image_to_memory(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
+  void *ptr;
+  int retval;
+  const char *data;
+  unsigned long int size;
+  CameraFile *file;
+  CameraFilePath camera_file_path;
+  ERL_NIF_TERM ret;
+
+  if(!enif_get_resource(env, argv[0], camera_res, &ptr)) {
+    return enif_make_tuple2(env,
+                            enif_make_atom(env, "error"),
+                            enif_make_atom(env, "referenced_resource_error"));
+  }
+
+  strcpy(camera_file_path.folder, "/");
+  strcpy(camera_file_path.name, "foobar.jpg");
+
+  struct CameraEnv *ce = ptr;
+  retval = gp_camera_capture(ce->camera, GP_CAPTURE_IMAGE, &camera_file_path, ce->context);
+
+  retval = gp_file_new(&file);
+  retval = gp_camera_file_get(ce->camera, camera_file_path.folder, camera_file_path.name,
+                              GP_FILE_TYPE_NORMAL, file, ce->context);
+
+
+  gp_file_get_data_and_size (file, (const char **)&data, &size);
+  unsigned char *data_buff = enif_make_new_binary(env, size, &ret);
+  memcpy(data_buff, data, size);
+
+  gp_camera_file_delete(ce->camera, camera_file_path.folder, camera_file_path.name,
+			ce->context);
+
+  gp_file_free(file);
+
+  return enif_make_tuple2(env,
+                          enif_make_atom(env, "ok"),
+                          ret);
+}
+
+static ERL_NIF_TERM
+capture_image_to_file(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
   void *ptr;
   char output_file[32];
   if(enif_get_string(env, argv[1], output_file, sizeof(output_file), ERL_NIF_LATIN1) <= 0) {
@@ -93,14 +134,17 @@ create_env(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[]) {
   }
 
   // Return object
-  ERL_NIF_TERM ret = enif_make_resource(env, ptr);
+  ERL_NIF_TERM ret = enif_make_tuple2(env,
+                                      enif_make_atom(env, "ok"),
+                                      enif_make_resource(env, ptr));
   enif_release_resource(ptr);
   return ret;
 }
 
 static ErlNifFunc nif_funcs[] = {
                                  {"create_env", 0, create_env},
-                                 {"capture_photo", 2, capture_image}
+                                 {"capture_image", 1, capture_image_to_memory},
+                                 {"capture_image", 2, capture_image_to_file}
 };
 
 ERL_NIF_INIT(dslr, nif_funcs, load, NULL, NULL, NULL);
